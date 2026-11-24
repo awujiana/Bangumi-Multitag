@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bangumi 多标签检索</title>
+    <meta
+      name="description"
+      content="基于 Bangumi-Archive-Excel 五类分片数据的多标签检索站点，支持漫画、动画、音乐、游戏、三次元。"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="wrap">
+        <h1>Bangumi 多标签检索</h1>
+        <p>漫画 / 动画 / 音乐 / 游戏 / 三次元 · 数据来自 <a href="https://github.com/awujiana/Bangumi-Archive-Excel" target="_blank" rel="noreferrer">Bangumi-Archive-Excel</a></p>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="panel" aria-labelledby="query-title">
+        <h2 id="query-title">检索条件</h2>
+
+        <label class="field">
+          <span>关键词</span>
+          <input id="keyword" type="search" placeholder="名称 / 原名，支持空格分隔" autocomplete="off" />
+        </label>
+
+        <label class="field">
+          <span>标签表达式</span>
+          <input id="tags" type="text" placeholder="例：治愈,日常,-血腥 或 机战,robot 后选择「任一匹配」" autocomplete="off" />
+          <small>逗号或空格分隔；<code>+标签</code> 必选，<code>-标签</code> 排除；标签名取自 Bangumi 用户标签。</small>
+        </label>
+
+        <div class="grid">
+          <fieldset>
+            <legend>条目类型</legend>
+            <div id="type-filters" class="chips"></div>
+          </fieldset>
+
+          <fieldset>
+            <legend>标签逻辑</legend>
+            <label><input type="radio" name="tag-mode" value="all" checked /> 全部匹配（AND）</label>
+            <label><input type="radio" name="tag-mode" value="any" /> 任一匹配（OR）</label>
+            <label><input id="only-fav" type="checkbox" /> 只看收藏</label>
+          </fieldset>
+
+          <label class="field">
+            <span>排序</span>
+            <select id="sort">
+              <option value="score">评分从高到低</option>
+              <option value="rank">排名从小到大</option>
+              <option value="date">日期从新到旧</option>
+              <option value="name">名称 A→Z</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>显示条数</span>
+            <select id="limit">
+              <option value="50">50</option>
+              <option value="100" selected>100</option>
+              <option value="200">200</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="search" type="button" disabled>检索</button>
+          <button id="load-all" type="button">预加载全部类型</button>
+          <span id="status" role="status">正在读取清单…</span>
+        </div>
+      </section>
+
+      <section aria-labelledby="results-title">
+        <div class="results-head">
+          <h2 id="results-title">结果</h2>
+          <span id="result-count"></span>
+        </div>
+        <div id="results" class="results" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <footer class="wrap footer">
+      <p>
+        参考 <a href="https://github.com/wlm3201/Bangumi-Multitag" target="_blank" rel="noreferrer">wlm3201/Bangumi-Multitag</a>
+        的交互思路；本站点直接使用每周更新的 JSONL 分片，无需 Bangumi API token。
+      </p>
+    </footer>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
