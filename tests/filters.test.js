@@ -11,6 +11,7 @@ const {
   parseTagQuery,
   matches,
   rankLabel,
+  matchesRank,
   sortRecords,
 } = require('../filters.js');
 
@@ -258,10 +259,45 @@ test('排名展示：始终标注所属条目类型', () => {
   assert.ok(rankLabel('动画', 7).startsWith('动画排名'));
 });
 
-test('排名展示：无排名时显示「—」且保留类型', () => {
+test('排名展示：无排名时显示「未上榜」且保留类型', () => {
   for (const value of [0, null, undefined, '', NaN, 'abc']) {
-    assert.equal(rankLabel('动画', value), '动画排名 —');
+    assert.equal(rankLabel('动画', value), '动画未上榜');
   }
+});
+
+test('排名筛选：不限 / 有排名 / 未上榜', () => {
+  assert.equal(matchesRank(0, 'any'), true);
+  assert.equal(matchesRank(50, 'any'), true);
+  assert.equal(matchesRank(undefined, 'any'), true);
+
+  assert.equal(matchesRank(0, 'ranked'), false);
+  assert.equal(matchesRank(1, 'ranked'), true);
+
+  assert.equal(matchesRank(0, 'unranked'), true);
+  assert.equal(matchesRank(1, 'unranked'), false);
+});
+
+test('排名筛选：前 N 名包含边界，未上榜不入选', () => {
+  assert.equal(matchesRank(100, 'top100'), true);
+  assert.equal(matchesRank(101, 'top100'), false);
+  assert.equal(matchesRank(0, 'top100'), false);
+  assert.equal(matchesRank(500, 'top500'), true);
+  assert.equal(matchesRank(501, 'top500'), false);
+  assert.equal(matchesRank(5000, 'top5000'), true);
+  assert.equal(matchesRank(5001, 'top5000'), false);
+});
+
+test('排名筛选：未知模式或非法阈值不限制', () => {
+  assert.equal(matchesRank(123, 'unknown'), true);
+  assert.equal(matchesRank(123, 'top0'), true);
+  assert.equal(matchesRank(123, ''), true);
+});
+
+test('筛选：排名条件可与其他条件叠加', () => {
+  const record = makeRecord({ rank: 0 });
+  const empty = emptyFilter();
+  assert.equal(matches(record, [], parseTagQuery(''), empty, empty, 'all', false, new Set(), 'unranked'), true);
+  assert.equal(matches(record, [], parseTagQuery(''), empty, empty, 'all', false, new Set(), 'top100'), false);
 });
 
 test('排名展示：数字字符串按数值处理', () => {

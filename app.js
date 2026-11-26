@@ -44,6 +44,7 @@ const elements = {
   keyword: document.getElementById('keyword'),
   tags: document.getElementById('tags'),
   sort: document.getElementById('sort'),
+  rankFilter: document.getElementById('rank-filter'),
   limit: document.getElementById('limit'),
   onlyFav: document.getElementById('only-fav'),
   search: document.getElementById('search'),
@@ -208,19 +209,24 @@ function makeCard(record, hitTags) {
   link.rel = 'noreferrer';
   link.textContent = record.name || record.original || `#${record.sid}`;
   title.append(link);
+  const badges = document.createElement('div');
+  badges.className = 'badges';
   const badge = document.createElement('span');
   badge.className = 'type-badge';
   badge.style.background = record.color;
   badge.textContent = record.typeName;
-  head.append(title, badge);
+  const rankBadge = document.createElement('span');
+  rankBadge.className = record.rank ? 'rank-badge' : 'rank-badge is-empty';
+  rankBadge.textContent = rankLabel(record.typeName, record.rank);
+  badges.append(badge, rankBadge);
+  head.append(title, badges);
   card.append(head);
 
   const meta = document.createElement('div');
   meta.className = 'meta';
   const score = record.score ? record.score.toFixed(1) : '—';
   const platform = platformName(record.type, record.platform);
-  // 排名是条目类型内的排名，标注类型避免跨类型比较时产生误解。
-  meta.textContent = `${platform} · ${record.date || '日期未知'} · 评分 ${score} · ${rankLabel(record.typeName, record.rank)}`;
+  meta.textContent = `${platform} · ${record.date || '日期未知'} · 评分 ${score}`;
   card.append(meta);
 
   const relationNames = [
@@ -299,6 +305,7 @@ async function runSearch() {
     const platformFilter = selectedPlatforms();
     const relationFilter = selectedRelations();
     const mode = document.querySelector('input[name="tag-mode"]:checked').value;
+    const rankMode = elements.rankFilter.value;
     const filtered = allRecords.filter((record) =>
       matches(
         record,
@@ -309,6 +316,7 @@ async function runSearch() {
         mode,
         elements.onlyFav.checked,
         state.favorites,
+        rankMode,
       ),
     );
     renderResults(sortRecords(filtered, elements.sort.value), tagQuery);
@@ -428,6 +436,7 @@ function initEvents() {
     });
   });
   elements.sort.addEventListener('change', runSearch);
+  elements.rankFilter.addEventListener('change', runSearch);
   elements.limit.addEventListener('change', runSearch);
   elements.onlyFav.addEventListener('change', runSearch);
   elements.clearRelations.addEventListener('click', () => {

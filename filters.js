@@ -239,8 +239,10 @@
     mode,
     onlyFav,
     favorites = new Set(),
+    rankMode = 'any',
   ) {
     if (onlyFav && !favorites.has(record.key)) return false;
+    if (!matchesRank(record.rank, rankMode)) return false;
 
     const wantedPlatforms = platformFilter.get(record.type);
     if (wantedPlatforms && wantedPlatforms.size && !wantedPlatforms.has(record.platform)) {
@@ -269,11 +271,27 @@
 
   /**
    * 排名展示：排名是条目类型内的排名，必须带上类型名，避免跨类型混排时误读。
-   * 无排名（0 / 空值 / 非数字）显示「—」。
+   * 无排名（0 / 空值 / 非数字）显示「未上榜」。
    */
   function rankLabel(typeName, rankValue) {
     const rank = Number(rankValue) || 0;
-    return `${typeName}排名 ${rank ? `#${rank}` : '—'}`;
+    return rank ? `${typeName}排名 #${rank}` : `${typeName}未上榜`;
+  }
+
+  /**
+   * 排名筛选：`any` 不限，`ranked` 只看有排名，`unranked` 只看未上榜，
+   * `top{N}` 表示排名进入前 N。
+   */
+  function matchesRank(rankValue, mode = 'any') {
+    const rank = Number(rankValue) || 0;
+    if (!mode || mode === 'any') return true;
+    if (mode === 'ranked') return rank > 0;
+    if (mode === 'unranked') return rank === 0;
+    const matched = /^top(\d+)$/.exec(mode);
+    if (!matched) return true;
+    const limit = Number(matched[1]);
+    if (!Number.isFinite(limit) || limit <= 0) return true;
+    return rank > 0 && rank <= limit;
   }
 
   function sortRecords(records, sortBy) {
@@ -298,6 +316,7 @@
     hasTag,
     matches,
     rankLabel,
+    matchesRank,
     sortRecords,
   };
 });
