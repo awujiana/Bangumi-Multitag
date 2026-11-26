@@ -116,7 +116,8 @@ code {
   grid-column: 1 / -1;
 }
 
-#relation-filters:empty::before {
+#relation-filters:empty::before,
+#platform-filters:empty::before {
   content: "（未选择条目类型）";
   color: var(--muted);
 }
@@ -334,7 +335,8 @@ button:disabled {
   .actions button {
     flex: 1 1 auto;
   }
-  #relation-filters {
+  #relation-filters,
+  #platform-filters {
     max-height: 168px;
     overflow-y: auto;
   }

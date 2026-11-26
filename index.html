@@ -6,7 +6,7 @@
     <title>Bangumi 多标签检索</title>
     <meta
       name="description"
-      content="基于 Bangumi-Archive-Excel 五类分片数据的多标签检索站点，支持漫画、动画、音乐、游戏、三次元。"
+      content="基于 Bangumi-Archive-Excel 五类分片数据的多标签检索站点，支持漫画、动画、音乐、游戏、三次元，并按作品形态与关系类型筛选。"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -37,6 +37,13 @@
           <fieldset>
             <legend>条目类型</legend>
             <div id="type-filters" class="chips"></div>
+          </fieldset>
+
+          <fieldset class="span-all">
+            <legend>作品形态</legend>
+            <div id="platform-filters" class="chips" aria-live="polite"></div>
+            <small id="platform-hint">先选择条目类型，再按作品形态（TV / OVA / 剧场版 / 漫画 / 小说 等）筛选。</small>
+            <button id="clear-platforms" class="link-button" type="button">清空形态筛选</button>
           </fieldset>
 
           <fieldset class="span-all">

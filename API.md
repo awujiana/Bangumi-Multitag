@@ -212,7 +212,7 @@ picked = [
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `platform` | number | 平台代码，原样保留，取值含义由 Bangumi 定义 |
+| `platform` | number | 作品形态 / 分类代码，按条目类型各自定义（动画 `1=TV`、`2=OVA`、`3=剧场版`、`2006=动态漫画`；书籍 `1001=漫画`、`1002=小说`…），完整对照见 [平台编码表](https://github.com/awujiana/Bangumi-Archive-Excel/blob/main/docs/条目类型与关系类型说明.md) |
 | `series` | boolean | 是否为系列作品 |
 | `score` | number | 平均分，一位小数；`0` 表示暂无评分 |
 | `rank` | number | 类别内排名；`0` 表示未上榜 / 无排名 |

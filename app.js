@@ -36,6 +36,32 @@ const RELATION_TYPES = {
   },
 };
 
+// 平台 / 分类编码（与 Archive 文档「平台编码表」一致）。编码按条目类型各自定义。
+const PLATFORMS = {
+  manga: [
+    [1001, '漫画'], [1002, '小说'], [1003, '画集'], [1004, '绘本'],
+    [1005, '写真'], [1006, '公式书'], [0, '其他'],
+  ],
+  anime: [
+    [1, 'TV'], [5, 'WEB'], [2, 'OVA'], [3, '剧场版'], [2006, '动态漫画'],
+    [4, '短片'], [0, '其他'],
+  ],
+  music: [[3001, '专辑'], [3002, '广播剧'], [3003, '音频'], [3004, '电台'], [0, '其他']],
+  game: [
+    [4001, '游戏'], [4002, '软件'], [4003, '扩展包'], [4004, '试玩版'],
+    [4005, '桌游'], [0, '其他'],
+  ],
+  real: [
+    [1, '日剧'], [2, '欧美剧'], [3, '华语剧'], [6001, '电视剧'],
+    [6002, '电影'], [6003, '演出'], [6004, '综艺'], [0, '其他'],
+  ],
+};
+
+function platformName(typeKey, value) {
+  const hit = (PLATFORMS[typeKey] || []).find(([code]) => code === Number(value));
+  return hit ? hit[1] : '其他';
+}
+
 const DATA_BASE =
   'https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Excel/main/data/';
 const FAV_KEY = 'awujiana-bangumi-multitag-favorites';
@@ -49,6 +75,9 @@ const state = {
 
 const elements = {
   typeFilters: document.getElementById('type-filters'),
+  platformFilters: document.getElementById('platform-filters'),
+  platformHint: document.getElementById('platform-hint'),
+  clearPlatforms: document.getElementById('clear-platforms'),
   relationFilters: document.getElementById('relation-filters'),
   relationHint: document.getElementById('relation-hint'),
   clearRelations: document.getElementById('clear-relations'),
@@ -176,6 +205,7 @@ function buildRecord(type, row) {
     date: String(row.date || ''),
     score: Number(row.score) || 0,
     rank: Number(row.rank) || 0,
+    platform: Number(row.platform) || 0,
     tags,
     relations: parseRelations(row['关联关系']),
   };
@@ -247,6 +277,18 @@ function selectedRelations() {
   return result;
 }
 
+/** 读取分类（平台）筛选：Map<条目类型 key, Set<平台编码>>。 */
+function selectedPlatforms() {
+  const result = new Map();
+  elements.platformFilters.querySelectorAll('input:checked').forEach((input) => {
+    const [typeKey, code] = input.value.split(':');
+    if (!typeKey || code === undefined) return;
+    if (!result.has(typeKey)) result.set(typeKey, new Set());
+    result.get(typeKey).add(Number(code));
+  });
+  return result;
+}
+
 function parseTagQuery(input) {
   const tokens = input.split(/[,，\s]+/).map(normalizeTag).filter(Boolean);
   const required = [];
@@ -264,8 +306,10 @@ function hasTag(recordTags, needle) {
   return recordTags.some((tag) => tag.includes(needle) || needle.includes(tag));
 }
 
-function matches(record, keywords, tagQuery, relationFilter, mode, onlyFav) {
+function matches(record, keywords, tagQuery, platformFilter, relationFilter, mode, onlyFav) {
   if (onlyFav && !state.favorites.has(record.key)) return false;
+  const wantedPlatforms = platformFilter.get(record.type);
+  if (wantedPlatforms && wantedPlatforms.size && !wantedPlatforms.has(record.platform)) return false;
   const wanted = relationFilter.get(record.type);
   if (wanted && wanted.size) {
     if (!record.relations.some((relation) => wanted.has(relation.type))) return false;
@@ -314,7 +358,8 @@ function makeCard(record, hitTags) {
   meta.className = 'meta';
   const score = record.score ? record.score.toFixed(1) : '—';
   const rank = record.rank ? `#${record.rank}` : '—';
-  meta.textContent = `${record.date || '日期未知'} · 评分 ${score} · 排名 ${rank}`;
+  const platform = platformName(record.type, record.platform);
+  meta.textContent = `${platform} · ${record.date || '日期未知'} · 评分 ${score} · 排名 ${rank}`;
   card.append(meta);
 
   const relationNames = [
@@ -390,10 +435,19 @@ async function runSearch() {
     }
     const keywords = elements.keyword.value.toLowerCase().split(/\s+/).filter(Boolean);
     const tagQuery = parseTagQuery(elements.tags.value);
+    const platformFilter = selectedPlatforms();
     const relationFilter = selectedRelations();
     const mode = document.querySelector('input[name="tag-mode"]:checked').value;
     const filtered = allRecords.filter((record) =>
-      matches(record, keywords, tagQuery, relationFilter, mode, elements.onlyFav.checked),
+      matches(
+        record,
+        keywords,
+        tagQuery,
+        platformFilter,
+        relationFilter,
+        mode,
+        elements.onlyFav.checked,
+      ),
     );
     renderResults(sortRecords(filtered, elements.sort.value), tagQuery);
     setStatus(`检索完成：${allRecords.length.toLocaleString('zh-CN')} 条候选`);
@@ -402,6 +456,38 @@ async function runSearch() {
   } finally {
     elements.search.disabled = false;
   }
+}
+
+/** 按当前选中的条目类型重建分类（平台）chips，并保留仍然有效的勾选。 */
+function renderPlatformFilters() {
+  const previous = selectedPlatforms();
+  elements.platformFilters.replaceChildren();
+  const types = selectedTypes();
+  if (!types.length) {
+    elements.platformHint.textContent = '先选择条目类型，再按分类筛选。';
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  let total = 0;
+  const showPrefix = types.length > 1;
+  types.forEach((type) => {
+    (PLATFORMS[type.key] || []).forEach(([code, name]) => {
+      total += 1;
+      const label = document.createElement('label');
+      label.className = 'chip';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = `${type.key}:${code}`;
+      input.checked = previous.get(type.key)?.has(Number(code)) ?? false;
+      const text = document.createElement('span');
+      text.textContent = showPrefix ? `${type.name}·${name}` : name;
+      label.append(input, text);
+      fragment.append(label);
+    });
+  });
+  elements.platformFilters.append(fragment);
+  elements.platformHint.textContent = `共 ${total} 个分类，勾选后为「任一匹配」；不选则不限制。`;
 }
 
 /** 按当前选中的条目类型重建关系类型 chips，并保留仍然有效的勾选。 */
@@ -451,9 +537,13 @@ function initTypeFilters() {
     const text = document.createElement('span');
     text.textContent = type.name;
     label.append(input, dot, text);
-    input.addEventListener('change', renderRelationFilters);
+    input.addEventListener('change', () => {
+      renderPlatformFilters();
+      renderRelationFilters();
+    });
     elements.typeFilters.append(label);
   });
+  renderPlatformFilters();
   renderRelationFilters();
 }
 
@@ -480,6 +570,11 @@ function initEvents() {
   elements.onlyFav.addEventListener('change', runSearch);
   elements.clearRelations.addEventListener('click', () => {
     elements.relationFilters.querySelectorAll('input:checked').forEach((input) => {
+      input.checked = false;
+    });
+  });
+  elements.clearPlatforms.addEventListener('click', () => {
+    elements.platformFilters.querySelectorAll('input:checked').forEach((input) => {
       input.checked = false;
     });
   });
