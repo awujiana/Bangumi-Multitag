@@ -22,8 +22,19 @@ const {
   sortRecords,
 } = window.BgmFilters;
 
-const DATA_BASE =
-  'https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Excel/main/data/';
+// 数据源按顺序尝试：GitHub Raw 优先，失败后自动回退到 jsDelivr。
+const DATA_SOURCES = [
+  {
+    label: 'GitHub Raw',
+    base: 'https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Excel/main/data/',
+  },
+  {
+    label: 'jsDelivr',
+    base: 'https://cdn.jsdelivr.net/gh/awujiana/Bangumi-Archive-Excel@main/data/',
+  },
+];
+// 记录最近一次成功的源，后续请求优先复用，避免每个分片都重试失败源。
+let activeBase = null;
 const FAV_KEY = 'awujiana-bangumi-multitag-favorites';
 
 const state = {
@@ -72,16 +83,72 @@ function setStatus(message, isError = false) {
   elements.status.classList.toggle('error', Boolean(isError));
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
-  return response.json();
+class HttpError extends Error {
+  constructor(status, url) {
+    super(`HTTP ${status}: ${url}`);
+    this.status = status;
+    this.url = url;
+  }
 }
 
-async function decodeShard(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
-  const buffer = await response.arrayBuffer();
+function dataSourcesInOrder() {
+  if (!activeBase) return DATA_SOURCES;
+  const active = DATA_SOURCES.find((source) => source.base === activeBase);
+  return active ? [active, ...DATA_SOURCES.filter((source) => source !== active)] : DATA_SOURCES;
+}
+
+function describeFetchFailure(error) {
+  if (error instanceof HttpError) return `HTTP ${error.status}`;
+  const message = String((error && error.message) || error);
+  if (/Failed to fetch|NetworkError|Load failed/i.test(message)) {
+    return '网络请求失败（Failed to fetch）';
+  }
+  return message;
+}
+
+/** 读取数据文件，失败时按顺序切换数据源，并给出可操作的错误说明。 */
+async function requestData(path, { binary = false } = {}) {
+  if (location.protocol === 'file:') {
+    throw new Error(
+      '当前页面以 file:// 打开，浏览器禁止读取远端数据。请在本目录运行 python -m http.server 8000，再访问 http://localhost:8000/',
+    );
+  }
+
+  const failures = [];
+  for (const source of dataSourcesInOrder()) {
+    const url = `${source.base}${path}`;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new HttpError(response.status, url);
+      activeBase = source.base;
+      if (binary) return new Uint8Array(await response.arrayBuffer());
+      return await response.json();
+    } catch (error) {
+      failures.push(`${source.label}：${describeFetchFailure(error)}`);
+      if (activeBase === source.base) activeBase = null;
+    }
+  }
+
+  const detail = failures.join('；');
+  let reason = '无法连接数据源';
+  if (failures.some((item) => item.includes('HTTP 404'))) {
+    reason = '数据文件不存在，可能是数据尚未推送或路径已变更';
+  } else if (failures.some((item) => /HTTP (403|429)/.test(item))) {
+    reason = '数据源限流或拒绝访问';
+  } else if (navigator.onLine === false) {
+    reason = '当前设备处于离线状态';
+  }
+  throw new Error(
+    `${path} 读取失败（${detail}）。${reason}。请检查网络或代理后重试；部分网络环境访问 GitHub 需要代理。`,
+  );
+}
+
+async function fetchJson(path) {
+  return requestData(path);
+}
+
+async function decodeShard(path) {
+  const buffer = await requestData(path, { binary: true });
   const bytes = new Uint8Array(buffer);
   if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
     if (typeof DecompressionStream !== 'function') {
@@ -136,7 +203,7 @@ async function loadType(type) {
     setStatus(`正在加载${type.name}…`);
     let manifest = state.manifests.get(type.key);
     if (!manifest) {
-      manifest = await fetchJson(`${DATA_BASE}${type.key}/${type.key}.manifest.json`);
+      manifest = await fetchJson(`${type.key}/${type.key}.manifest.json`);
       state.manifests.set(type.key, manifest);
     }
 
@@ -148,7 +215,7 @@ async function loadType(type) {
     const parsed = await Promise.all(
       picked.map(async (shard) => ({
         name: shard.name,
-        rows: parseJsonLines(await decodeShard(`${DATA_BASE}${type.key}/${shard.file}`)),
+        rows: parseJsonLines(await decodeShard(`${type.key}/${shard.file}`)),
       })),
     );
     const byName = Object.fromEntries(parsed.map((item) => [item.name, item.rows]));
@@ -322,7 +389,11 @@ async function runSearch() {
     renderResults(sortRecords(filtered, elements.sort.value), tagQuery);
     setStatus(`检索完成：${allRecords.length.toLocaleString('zh-CN')} 条候选`);
   } catch (error) {
-    setStatus(`加载失败：${error.message}`, true);
+    console.error('[Bangumi Multitag] 加载失败', error);
+    const retryHint = /file:\/\//.test(error.message)
+      ? ''
+      : '\n已尝试数据源：GitHub Raw、jsDelivr；可点击「检索」重试。';
+    setStatus(`加载失败：${error.message}${retryHint}`, true);
   } finally {
     elements.search.disabled = false;
   }
@@ -425,6 +496,7 @@ function initEvents() {
       for (const type of TYPES) await loadType(type);
       setStatus('全部类型已加载');
     } catch (error) {
+      console.error('[Bangumi Multitag] 预加载失败', error);
       setStatus(`预加载失败：${error.message}`, true);
     } finally {
       elements.loadAll.disabled = false;
@@ -454,6 +526,15 @@ function initEvents() {
 async function init() {
   initTypeFilters();
   initEvents();
+  if (location.protocol === 'file:') {
+    elements.search.disabled = true;
+    elements.loadAll.disabled = true;
+    setStatus(
+      '加载失败：当前页面以 file:// 直接打开，浏览器禁止读取远端数据。\n请在本目录运行 python -m http.server 8000，然后访问 http://localhost:8000/',
+      true,
+    );
+    return;
+  }
   setStatus('清单就绪，点击检索或预加载');
   elements.search.disabled = false;
   try {

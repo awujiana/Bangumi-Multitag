@@ -13,6 +13,20 @@
 
 站点地址：<https://awujiana.github.io/Bangumi-Multitag/>
 
+## 加载失败 / Failed to fetch
+
+页面会先请求 GitHub Raw，失败后自动回退到 jsDelivr；两者都失败才报错，并在状态栏列出每个数据源的失败原因。
+
+常见原因与处理：
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `file://` 下提示禁止读取远端数据 | 直接双击了 `index.html` | 本目录执行 `python -m http.server 8000`，访问 `http://localhost:8000/` |
+| `Failed to fetch`（两个源都失败） | 断网、DNS/代理限制、GitHub 被拦截 | 检查网络或代理后点「检索」重试；可先访问 `https://raw.githubusercontent.com` 自测 |
+| `HTTP 404` | 数据未推送或路径变更 | 等 Actions 完成，或在数据仓库执行 `git pull` 后重试 |
+| `HTTP 403/429` | 数据源限流 | 稍后重试，或改用本地数据文件 |
+| 解压失败 | 浏览器过旧 | 使用 Chrome/Edge 80+、Safari 16.4+ 等支持 `DecompressionStream` 的浏览器 |
+
 ## 测试
 
 纯筛选逻辑位于 `filters.js`，浏览器与 Node 共用同一份实现。无需安装依赖：

@@ -213,6 +213,8 @@ button:disabled {
 
 #status {
   color: var(--muted);
+  white-space: pre-line;
+  line-height: 1.6;
 }
 
 #status.error {
