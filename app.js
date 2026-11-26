@@ -219,7 +219,8 @@ function makeCard(record, hitTags) {
   const score = record.score ? record.score.toFixed(1) : '—';
   const rank = record.rank ? `#${record.rank}` : '—';
   const platform = platformName(record.type, record.platform);
-  meta.textContent = `${platform} · ${record.date || '日期未知'} · 评分 ${score} · 排名 ${rank}`;
+  // 排名是条目类型内的排名，标注类型避免跨类型比较时产生误解。
+  meta.textContent = `${platform} · ${record.date || '日期未知'} · 评分 ${score} · ${record.typeName}排名 ${rank}`;
   card.append(meta);
 
   const relationNames = [
