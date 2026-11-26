@@ -112,6 +112,38 @@ code {
   margin: 12px 0;
 }
 
+.grid .span-all {
+  grid-column: 1 / -1;
+}
+
+#relation-filters:empty::before {
+  content: "（未选择条目类型）";
+  color: var(--muted);
+}
+
+.chip small {
+  display: inline;
+  margin: 0;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.link-button {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+}
+
+.relations {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 fieldset {
   margin: 0;
   padding: 10px 12px;
@@ -301,5 +333,9 @@ button:disabled {
   }
   .actions button {
     flex: 1 1 auto;
+  }
+  #relation-filters {
+    max-height: 168px;
+    overflow-y: auto;
   }
 }

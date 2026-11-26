@@ -39,6 +39,13 @@
             <div id="type-filters" class="chips"></div>
           </fieldset>
 
+          <fieldset class="span-all">
+            <legend>关系类型</legend>
+            <div id="relation-filters" class="chips" aria-live="polite"></div>
+            <small id="relation-hint">先选择条目类型，再按关联关系筛选；多个关系类型之间为「任一匹配」。</small>
+            <button id="clear-relations" class="link-button" type="button">清空关系筛选</button>
+          </fieldset>
+
           <fieldset>
             <legend>标签逻辑</legend>
             <label><input type="radio" name="tag-mode" value="all" checked /> 全部匹配（AND）</label>

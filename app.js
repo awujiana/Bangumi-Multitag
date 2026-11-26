@@ -6,6 +6,36 @@ const TYPES = [
   { key: 'real', name: '三次元', type: 6, color: '#1a7f37' },
 ];
 
+// 关系类型编码按条目类型各自定义，数字会跨类型撞车，必须按 type.key 取表。
+const RELATION_TYPES = {
+  manga: {
+    1: '改编', 1002: '系列', 1003: '单行本', 1004: '画集', 1005: '前传',
+    1006: '续集', 1007: '番外篇', 1008: '主线故事', 1010: '不同版本',
+    1011: '角色出演', 1012: '相同世界观', 1013: '不同世界观', 1014: '联动',
+    1015: '不同演绎', 1099: '其他',
+  },
+  anime: {
+    1: '改编', 2: '前传', 3: '续集', 4: '总集篇', 5: '全集', 6: '番外篇',
+    7: '角色出演', 8: '相同世界观', 9: '不同世界观', 10: '不同演绎',
+    11: '衍生', 12: '主线故事', 14: '联动', 99: '其他',
+  },
+  music: {
+    3001: '原声集', 3002: '角色歌', 3003: '片头曲', 3004: '片尾曲',
+    3005: '插入歌', 3006: '印象曲', 3007: '广播剧', 3099: '其他',
+  },
+  game: {
+    1: '改编', 4002: '前传', 4003: '续集', 4006: '外传', 4007: '角色出演',
+    4008: '相同世界观', 4009: '不同世界观', 4010: '不同演绎', 4012: '主线故事',
+    4014: '联动', 4015: '扩展包', 4016: '不同版本', 4017: '主版本',
+    4018: '合集', 4019: '收录作品', 4099: '其他',
+  },
+  real: {
+    1: '改编', 2: '前传', 3: '续集', 4: '总集篇', 5: '全集', 6: '番外篇',
+    7: '角色出演', 8: '相同世界观', 9: '不同世界观', 10: '不同演绎',
+    11: '衍生', 12: '主线故事', 14: '联动', 99: '其他',
+  },
+};
+
 const DATA_BASE =
   'https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Excel/main/data/';
 const FAV_KEY = 'awujiana-bangumi-multitag-favorites';
@@ -19,6 +49,9 @@ const state = {
 
 const elements = {
   typeFilters: document.getElementById('type-filters'),
+  relationFilters: document.getElementById('relation-filters'),
+  relationHint: document.getElementById('relation-hint'),
+  clearRelations: document.getElementById('clear-relations'),
   keyword: document.getElementById('keyword'),
   tags: document.getElementById('tags'),
   sort: document.getElementById('sort'),
@@ -98,6 +131,24 @@ function normalizeTag(tag) {
   return String(tag).trim().toLowerCase();
 }
 
+/** 解析「关系类型:关联ID | 关系类型:关联ID」字段。 */
+function parseRelations(value) {
+  if (typeof value !== 'string' || !value) return [];
+  return value
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const index = part.indexOf(':');
+      if (index < 0) return null;
+      const relationType = Number(part.slice(0, index));
+      const id = part.slice(index + 1).trim();
+      if (!Number.isFinite(relationType) || !id) return null;
+      return { type: relationType, id };
+    })
+    .filter(Boolean);
+}
+
 function buildRecord(type, row) {
   const sid = String(row.sid ?? '');
   const tags = [...new Set([...toStringArray(row.tags), ...toStringArray(row.meta_tags)].map(normalizeTag).filter(Boolean))];
@@ -113,6 +164,7 @@ function buildRecord(type, row) {
     score: Number(row.score) || 0,
     rank: Number(row.rank) || 0,
     tags,
+    relations: parseRelations(row['关联关系']),
   };
 }
 
@@ -129,7 +181,8 @@ async function loadType(type) {
     }
 
     const names = new Set(manifest.shards.map((shard) => shard.name));
-    const picked = manifest.shards.filter((shard) => shard.name === 'base' || shard.name === 'stats');
+    const wanted = new Set(['base', 'stats', 'relations']);
+    const picked = manifest.shards.filter((shard) => wanted.has(shard.name));
     if (!names.has('base')) throw new Error(`${type.key} 清单缺少 base 分片`);
 
     const parsed = await Promise.all(
@@ -141,7 +194,14 @@ async function loadType(type) {
     const byName = Object.fromEntries(parsed.map((item) => [item.name, item.rows]));
     const baseRows = byName.base || [];
     const statsRows = byName.stats || [];
-    const records = baseRows.map((row, index) => buildRecord(type, { ...row, ...(statsRows[index] || {}) }));
+    const relationRows = byName.relations || [];
+    const records = baseRows.map((row, index) =>
+      buildRecord(type, {
+        ...row,
+        ...(statsRows[index] || {}),
+        ...(relationRows[index] || {}),
+      }),
+    );
     state.records.set(type.key, records);
     setStatus(`${type.name}已加载 ${records.length.toLocaleString('zh-CN')} 条`);
     return records;
@@ -162,6 +222,18 @@ function selectedTypes() {
   });
 }
 
+/** 读取关系类型筛选：Map<条目类型 key, Set<关系类型编码>>。 */
+function selectedRelations() {
+  const result = new Map();
+  elements.relationFilters.querySelectorAll('input:checked').forEach((input) => {
+    const [typeKey, relationType] = input.value.split(':');
+    if (!typeKey || !relationType) return;
+    if (!result.has(typeKey)) result.set(typeKey, new Set());
+    result.get(typeKey).add(Number(relationType));
+  });
+  return result;
+}
+
 function parseTagQuery(input) {
   const tokens = input.split(/[,，\s]+/).map(normalizeTag).filter(Boolean);
   const required = [];
@@ -179,8 +251,12 @@ function hasTag(recordTags, needle) {
   return recordTags.some((tag) => tag.includes(needle) || needle.includes(tag));
 }
 
-function matches(record, keywords, tagQuery, mode, onlyFav) {
+function matches(record, keywords, tagQuery, relationFilter, mode, onlyFav) {
   if (onlyFav && !state.favorites.has(record.key)) return false;
+  const wanted = relationFilter.get(record.type);
+  if (wanted && wanted.size) {
+    if (!record.relations.some((relation) => wanted.has(relation.type))) return false;
+  }
   const haystack = `${record.name} ${record.original}`.toLowerCase();
   if (!keywords.every((word) => haystack.includes(word))) return false;
   if (tagQuery.excluded.some((tag) => hasTag(record.tags, tag))) return false;
@@ -228,6 +304,20 @@ function makeCard(record, hitTags) {
   meta.textContent = `${record.date || '日期未知'} · 评分 ${score} · 排名 ${rank}`;
   card.append(meta);
 
+  const relationNames = [
+    ...new Set(
+      record.relations
+        .map((relation) => (RELATION_TYPES[record.type] || {})[relation.type])
+        .filter(Boolean),
+    ),
+  ].slice(0, 4);
+  if (relationNames.length) {
+    const relations = document.createElement('div');
+    relations.className = 'relations';
+    relations.textContent = `关系：${relationNames.join('、')}`;
+    card.append(relations);
+  }
+
   const tags = document.createElement('div');
   tags.className = 'tags';
   record.tags.slice(0, 14).forEach((tag) => {
@@ -260,7 +350,7 @@ function renderResults(records, tagQuery) {
   if (!records.length) {
     const empty = document.createElement('div');
     empty.className = 'empty';
-    empty.textContent = '没有匹配结果。试试减少标签、切换 AND/OR，或加载更多类型。';
+    empty.textContent = '没有匹配结果。试试减少标签或关系类型、切换 AND/OR，或加载更多类型。';
     elements.results.append(empty);
     return;
   }
@@ -287,9 +377,10 @@ async function runSearch() {
     }
     const keywords = elements.keyword.value.toLowerCase().split(/\s+/).filter(Boolean);
     const tagQuery = parseTagQuery(elements.tags.value);
+    const relationFilter = selectedRelations();
     const mode = document.querySelector('input[name="tag-mode"]:checked').value;
     const filtered = allRecords.filter((record) =>
-      matches(record, keywords, tagQuery, mode, elements.onlyFav.checked),
+      matches(record, keywords, tagQuery, relationFilter, mode, elements.onlyFav.checked),
     );
     renderResults(sortRecords(filtered, elements.sort.value), tagQuery);
     setStatus(`检索完成：${allRecords.length.toLocaleString('zh-CN')} 条候选`);
@@ -298,6 +389,39 @@ async function runSearch() {
   } finally {
     elements.search.disabled = false;
   }
+}
+
+/** 按当前选中的条目类型重建关系类型 chips，并保留仍然有效的勾选。 */
+function renderRelationFilters() {
+  const previous = selectedRelations();
+  elements.relationFilters.replaceChildren();
+  const types = selectedTypes();
+  if (!types.length) {
+    elements.relationHint.textContent = '先选择条目类型，再按关联关系筛选。';
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  let total = 0;
+  const showPrefix = types.length > 1;
+  types.forEach((type) => {
+    const labels = RELATION_TYPES[type.key] || {};
+    Object.entries(labels).forEach(([relationType, name]) => {
+      total += 1;
+      const label = document.createElement('label');
+      label.className = 'chip';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = `${type.key}:${relationType}`;
+      input.checked = previous.get(type.key)?.has(Number(relationType)) ?? false;
+      const text = document.createElement('span');
+      text.textContent = showPrefix ? `${type.name}·${name}` : name;
+      label.append(input, text);
+      fragment.append(label);
+    });
+  });
+  elements.relationFilters.append(fragment);
+  elements.relationHint.textContent = `共 ${total} 种关系类型，勾选后为「任一匹配」；不选则不限制。`;
 }
 
 function initTypeFilters() {
@@ -314,8 +438,10 @@ function initTypeFilters() {
     const text = document.createElement('span');
     text.textContent = type.name;
     label.append(input, dot, text);
+    input.addEventListener('change', renderRelationFilters);
     elements.typeFilters.append(label);
   });
+  renderRelationFilters();
 }
 
 function initEvents() {
@@ -339,6 +465,11 @@ function initEvents() {
   elements.sort.addEventListener('change', runSearch);
   elements.limit.addEventListener('change', runSearch);
   elements.onlyFav.addEventListener('change', runSearch);
+  elements.clearRelations.addEventListener('click', () => {
+    elements.relationFilters.querySelectorAll('input:checked').forEach((input) => {
+      input.checked = false;
+    });
+  });
 }
 
 async function init() {
