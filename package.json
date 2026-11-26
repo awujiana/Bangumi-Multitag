@@ -1,0 +1,9 @@
+{
+  "name": "bangumi-multitag",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bangumi 多标签检索静态站点",
+  "scripts": {
+    "test": "node --test"
+  }
+}
