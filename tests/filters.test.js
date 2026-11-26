@@ -10,6 +10,7 @@ const {
   filterMapFromValues,
   parseTagQuery,
   matches,
+  rankLabel,
   sortRecords,
 } = require('../filters.js');
 
@@ -246,6 +247,27 @@ test('标签表达式解析', () => {
     optional: ['治愈', '日常'],
   });
   assert.deepEqual(parseTagQuery('  '), { required: [], excluded: [], optional: [] });
+});
+
+test('排名展示：始终标注所属条目类型', () => {
+  assert.equal(rankLabel('动画', 123), '动画排名 #123');
+  assert.equal(rankLabel('漫画', 1), '漫画排名 #1');
+  assert.equal(rankLabel('三次元', 45), '三次元排名 #45');
+  // 不能退化成不带类型的裸排名
+  assert.notEqual(rankLabel('动画', 7), '#7');
+  assert.ok(rankLabel('动画', 7).startsWith('动画排名'));
+});
+
+test('排名展示：无排名时显示「—」且保留类型', () => {
+  for (const value of [0, null, undefined, '', NaN, 'abc']) {
+    assert.equal(rankLabel('动画', value), '动画排名 —');
+  }
+});
+
+test('排名展示：数字字符串按数值处理', () => {
+  assert.equal(rankLabel('游戏', '12'), '游戏排名 #12');
+  // 前导零按数值归一
+  assert.equal(rankLabel('游戏', '0012'), '游戏排名 #12');
 });
 
 test('排序：评分 / 排名 / 日期 / 名称', () => {

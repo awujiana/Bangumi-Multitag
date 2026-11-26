@@ -267,6 +267,15 @@
     return true;
   }
 
+  /**
+   * 排名展示：排名是条目类型内的排名，必须带上类型名，避免跨类型混排时误读。
+   * 无排名（0 / 空值 / 非数字）显示「—」。
+   */
+  function rankLabel(typeName, rankValue) {
+    const rank = Number(rankValue) || 0;
+    return `${typeName}排名 ${rank ? `#${rank}` : '—'}`;
+  }
+
   function sortRecords(records, sortBy) {
     const sorted = [...records];
     if (sortBy === 'score') sorted.sort((a, b) => b.score - a.score);
@@ -288,6 +297,7 @@
     parseTagQuery,
     hasTag,
     matches,
+    rankLabel,
     sortRecords,
   };
 });

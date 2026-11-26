@@ -18,6 +18,7 @@ const {
   parseTagQuery,
   hasTag,
   matches,
+  rankLabel,
   sortRecords,
 } = window.BgmFilters;
 
@@ -217,10 +218,9 @@ function makeCard(record, hitTags) {
   const meta = document.createElement('div');
   meta.className = 'meta';
   const score = record.score ? record.score.toFixed(1) : '—';
-  const rank = record.rank ? `#${record.rank}` : '—';
   const platform = platformName(record.type, record.platform);
   // 排名是条目类型内的排名，标注类型避免跨类型比较时产生误解。
-  meta.textContent = `${platform} · ${record.date || '日期未知'} · 评分 ${score} · ${record.typeName}排名 ${rank}`;
+  meta.textContent = `${platform} · ${record.date || '日期未知'} · 评分 ${score} · ${rankLabel(record.typeName, record.rank)}`;
   card.append(meta);
 
   const relationNames = [
