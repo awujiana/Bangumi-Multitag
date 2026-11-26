@@ -149,6 +149,19 @@ function parseRelations(value) {
     .filter(Boolean);
 }
 
+/**
+ * 关系类型中文名。关系编码由「被关联条目」的类型决定，因此同一部动画可能带有
+ * 书籍/音乐/游戏编码（如 3001 原声集）；先查自身类型，再按编码区间回退。
+ */
+function relationName(recordType, relationType) {
+  const own = RELATION_TYPES[recordType] || {};
+  if (own[relationType]) return own[relationType];
+  if (relationType >= 1002 && relationType <= 1099) return RELATION_TYPES.manga[relationType] || '其他';
+  if (relationType >= 3001 && relationType <= 3099) return RELATION_TYPES.music[relationType] || '其他';
+  if (relationType >= 4002 && relationType <= 4099) return RELATION_TYPES.game[relationType] || '其他';
+  return null;
+}
+
 function buildRecord(type, row) {
   const sid = String(row.sid ?? '');
   const tags = [...new Set([...toStringArray(row.tags), ...toStringArray(row.meta_tags)].map(normalizeTag).filter(Boolean))];
@@ -307,7 +320,7 @@ function makeCard(record, hitTags) {
   const relationNames = [
     ...new Set(
       record.relations
-        .map((relation) => (RELATION_TYPES[record.type] || {})[relation.type])
+        .map((relation) => relationName(record.type, relation.type))
         .filter(Boolean),
     ),
   ].slice(0, 4);
