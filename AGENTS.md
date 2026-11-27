@@ -21,7 +21,7 @@
 | `styles.css` | 全站样式 | ✅ |
 | `tests/filters.test.js` | `filters.js` 的单元测试 | ✅ |
 | `API.md` | 分片字段与数据格式说明 | ✅ |
-| `assets/main-interface.png` | README 主界面截图 | ✅ |
+| `assets/` | README 主界面截图 `main-interface.png`、微信赞赏码 `sponsor-qrcode.png` | ✅ |
 | `README.md` / `CONTRIBUTING.md` / `AGENTS.md` / `CHANGELOG.md` / `LICENSE` | 项目文档与协议 | ✅ |
 | `.nojekyll` | 关闭 GitHub Pages 的 Jekyll 处理 | ✅ |
 | `package.json` | 仅承载 `npm test` 脚本，无依赖 | ✅ |

@@ -8,6 +8,7 @@
 ### 改进
 
 - 按 awujiana README 风格补充 `CONTRIBUTING.md`、`AGENTS.md`、`CHANGELOG.md` 与 `LICENSE`，重写 README 并加入界面截图。
+- README 新增赞助章节与微信赞赏码，并补充文档结构测试。
 
 ## [1.1.0] - 2026-11-26
 
